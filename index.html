@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrenador de Notas Musicales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .radio-button-label {
+            transition: all 0.2s ease-in-out;
+        }
+        input[type="radio"]:checked + .radio-button-label {
+            background-color: #3b82f6; /* bg-blue-500 */
+            color: white;
+            border-color: #3b82f6; /* border-blue-500 */
+        }
+        .note-text {
+            font-size: clamp(4rem, 20vw, 10rem);
+            line-height: 1;
+        }
+        .staff-container svg {
+            max-width: 400px;
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-2xl shadow-lg p-6 md:p-8 space-y-6">
+        
+        <header class="text-center">
+            <h1 class="text-3xl font-bold text-gray-900">Entrenador de Notas</h1>
+            <p class="text-gray-600 mt-1">Practica tu digitación y lectura de notas</p>
+        </header>
+
+        <!-- Display Area -->
+        <div id="display-area" class="bg-gray-50 rounded-xl h-64 flex items-center justify-center border-2 border-gray-200">
+            <div id="text-display" class="font-bold text-blue-500 note-text">
+                🎵
+            </div>
+            <div id="staff-display" class="staff-container hidden w-full h-full flex items-center justify-center">
+                <svg id="staff-svg" viewBox="0 0 300 180"></svg>
+            </div>
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="space-y-6">
+            <!-- Scale Selector -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2 text-center">Tipo de Escala</label>
+                <div id="scale-selector" class="flex flex-wrap justify-center gap-2">
+                    <input type="radio" name="scale" id="natural" value="natural" class="hidden" checked>
+                    <label for="natural" class="radio-button-label cursor-pointer py-2 px-4 rounded-md border border-gray-300 font-medium text-sm">Natural</label>
+                    
+                    <input type="radio" name="scale" id="chromatic" value="chromatic" class="hidden">
+                    <label for="chromatic" class="radio-button-label cursor-pointer py-2 px-4 rounded-md border border-gray-300 font-medium text-sm">Cromática (#)</label>
+                    
+                    <input type="radio" name="scale" id="chromatic_random_enharmonic" value="chromatic_random_enharmonic" class="hidden">
+                    <label for="chromatic_random_enharmonic" class="radio-button-label cursor-pointer py-2 px-4 rounded-md border border-gray-300 font-medium text-sm">Cromática (Enarmónicos)</label>
+                </div>
+            </div>
+
+            <!-- Mode Selector -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2 text-center">Modo de Visualización</label>
+                <div id="mode-selector" class="flex justify-center gap-2">
+                     <input type="radio" name="mode" id="text" value="text" class="hidden" checked>
+                    <label for="text" class="radio-button-label cursor-pointer py-2 px-4 rounded-md border border-gray-300 font-medium text-sm">Texto</label>
+                    
+                    <input type="radio" name="mode" id="staff" value="staff" class="hidden">
+                    <label for="staff" class="radio-button-label cursor-pointer py-2 px-4 rounded-md border border-gray-300 font-medium text-sm">Pentagrama</label>
+                </div>
+            </div>
+            
+            <!-- Speed Control -->
+            <div>
+                <label for="speed-slider" class="block text-sm font-medium text-gray-700 mb-2 text-center">
+                    Velocidad: <span id="speed-value" class="font-bold text-blue-600">1.0</span> segundos
+                </label>
+                <input id="speed-slider" type="range" min="0.5" max="5" value="1" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex gap-4">
+            <button id="start-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200">
+                Empezar
+            </button>
+            <button id="stop-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200" disabled>
+                Parar
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM ELEMENTS ---
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValue = document.getElementById('speed-value');
+        const scaleSelector = document.getElementById('scale-selector');
+        const modeSelector = document.getElementById('mode-selector');
+        
+        const textDisplay = document.getElementById('text-display');
+        const staffDisplay = document.getElementById('staff-display');
+        const staffSvg = document.getElementById('staff-svg');
+
+        // --- NOTE DATA ---
+        const notes = {
+            text: {
+                natural: [['Do'], ['Re'], ['Mi'], ['Fa'], ['Sol'], ['La'], ['Si']],
+                chromatic: [['Do'], ['Do#'], ['Re'], ['Re#'], ['Mi'], ['Fa'], ['Fa#'], ['Sol'], ['Sol#'], ['La'], ['La#'], ['Si']],
+                chromatic_random_enharmonic: [
+                    ['Do'], ['Do#', 'Reb'], ['Re'], ['Re#', 'Mib'], ['Mi'], ['Fa'],
+                    ['Fa#', 'Solb'], ['Sol'], ['Sol#', 'Lab'], ['La'], ['La#', 'Sib'], ['Si']
+                ]
+            },
+            staff: {
+                natural: [['G4'], ['A4'], ['B4'], ['C5'], ['D5'], ['E5'], ['F5'], ['G5'], ['A5']],
+                chromatic: [['F#4'], ['G4'], ['G#4'], ['A4'], ['A#4'], ['B4'], ['C5'], ['C#5'], ['D5'], ['D#5'], ['E5'],['F5'], ['F#5'], ['G5'], ['G#5'], ['A5']],
+                chromatic_random_enharmonic: [
+                    ['F#4', 'Gb4'], ['G4'], ['G#4', 'Ab4'], ['A4'], ['A#4', 'Bb4'], ['B4'], ['C5'], ['C#5', 'Db5'], 
+                    ['D5'], ['D#5', 'Eb5'], ['E5'], ['F5'],['F#5', 'Gb5'], ['G5'], ['G#5', 'Ab5'], ['A5']
+                ]
+            }
+        };
+
+        const staffNotePositions = {
+            'A5': 54, 'Ab5': 54,
+            'G#5': 60, 'G5': 60, 'Gb5': 60,
+            'F#5': 66, 'F5': 66, 
+            'E5': 72, 'Eb5': 72,
+            'D#5': 78, 'D5': 78, 
+            'C#5': 84, 'C5': 84, 'Db5': 84,
+            'B4': 90, 'Bb4': 90,
+            'A#4': 96, 'A4': 96, 'Ab4': 96,
+            'G#4': 102, 'G4': 102, 'Gb4': 102,
+            'F#4': 108
+        };
+
+        // --- APP STATE ---
+        let timerId = null;
+        let lastNote = null;
+        let settings = { scale: 'natural', mode: 'text', speed: 1000 };
+        const SVG_NS = "http://www.w3.org/2000/svg";
+
+        // --- STAFF DRAWING FUNCTIONS ---
+        function drawStaff() {
+            staffSvg.innerHTML = ''; 
+            
+            for (let i = 0; i < 5; i++) {
+                const line = document.createElementNS(SVG_NS, 'line');
+                line.setAttribute('x1', '10'); line.setAttribute('y1', 66 + i * 12);
+                line.setAttribute('x2', '290'); line.setAttribute('y2', 66 + i * 12);
+                line.setAttribute('stroke', '#4b5563'); line.setAttribute('stroke-width', '1.5');
+                staffSvg.appendChild(line);
+            }
+
+            const noteGroup = document.createElementNS(SVG_NS, 'g');
+            noteGroup.id = 'note-group';
+            staffSvg.appendChild(noteGroup);
+        }
+        
+        function drawNoteOnStaff(noteName) {
+            const noteGroup = document.getElementById('note-group');
+            if (!noteGroup) return;
+            noteGroup.innerHTML = '';
+
+            const yPos = staffNotePositions[noteName];
+            const isSharp = noteName.includes('#');
+            const isFlat = noteName.includes('b');
+            const noteX = 150;
+
+            if (isSharp || isFlat) {
+                const accidental = document.createElementNS(SVG_NS, 'text');
+                // Corrected position for the flat and sharp
+                accidental.setAttribute('x', noteX - 28); 
+                accidental.setAttribute('y', yPos + (isFlat ? 8 : 6));
+                accidental.setAttribute('font-size', '32');
+                accidental.setAttribute('font-family', 'serif');
+                accidental.textContent = isSharp ? '♯' : '♭';
+                noteGroup.appendChild(accidental);
+            }
+
+            // Ledger line logic restored and verified
+            if (noteName === 'A5' || noteName === 'Ab5') {
+                const ledgerLine = document.createElementNS(SVG_NS, 'line');
+                ledgerLine.setAttribute('x1', noteX - 14); ledgerLine.setAttribute('y1', yPos);
+                ledgerLine.setAttribute('x2', noteX + 14); ledgerLine.setAttribute('y2', yPos);
+                ledgerLine.setAttribute('stroke', 'black'); ledgerLine.setAttribute('stroke-width', '2');
+                noteGroup.appendChild(ledgerLine);
+            }
+
+            const noteHead = document.createElementNS(SVG_NS, 'ellipse');
+            noteHead.setAttribute('cx', noteX); noteHead.setAttribute('cy', yPos);
+            noteHead.setAttribute('rx', '8'); noteHead.setAttribute('ry', '6');
+            noteHead.setAttribute('fill', 'black');
+            noteGroup.appendChild(noteHead);
+
+            const stem = document.createElementNS(SVG_NS, 'line');
+            const stemX = noteX + (yPos < 84 ? -7 : 7); 
+            stem.setAttribute('x1', stemX); stem.setAttribute('x2', stemX);
+            stem.setAttribute('y1', yPos); stem.setAttribute('y2', yPos + (yPos < 84 ? 35 : -35));
+            stem.setAttribute('stroke', 'black'); stem.setAttribute('stroke-width', '2');
+            noteGroup.appendChild(stem);
+        }
+
+        // --- MAIN LOGIC ---
+        function showRandomNote() {
+            const noteGroups = notes[settings.mode][settings.scale];
+            let randomNote;
+            
+            do {
+                const randomGroupIndex = Math.floor(Math.random() * noteGroups.length);
+                const noteGroup = noteGroups[randomGroupIndex];
+                const randomNoteIndex = Math.floor(Math.random() * noteGroup.length);
+                randomNote = noteGroup[randomNoteIndex];
+            } while (randomNote === lastNote && noteGroups.flat().length > 1);
+            
+            lastNote = randomNote;
+
+            if (settings.mode === 'text') {
+                textDisplay.textContent = randomNote;
+            } else {
+                drawNoteOnStaff(randomNote);
+            }
+        }
+
+        function startPractice() {
+            startBtn.disabled = true; stopBtn.disabled = false;
+            document.querySelectorAll('#scale-selector input, #mode-selector input, #speed-slider').forEach(el => el.disabled = true);
+            lastNote = null;
+            showRandomNote();
+            timerId = setInterval(showRandomNote, settings.speed);
+        }
+
+        function stopPractice() {
+            startBtn.disabled = false; stopBtn.disabled = true;
+            document.querySelectorAll('#scale-selector input, #mode-selector input, #speed-slider').forEach(el => el.disabled = false);
+            clearInterval(timerId);
+            timerId = null;
+            if (settings.mode === 'text') {
+                 textDisplay.textContent = '🎵';
+            } else {
+                 const noteGroup = document.getElementById('note-group');
+                 if(noteGroup) noteGroup.innerHTML = '';
+            }
+        }
+
+        // --- EVENT HANDLERS ---
+        startBtn.addEventListener('click', startPractice);
+        stopBtn.addEventListener('click', stopPractice);
+
+        speedSlider.addEventListener('input', (e) => {
+            const newSpeed = parseFloat(e.target.value);
+            settings.speed = newSpeed * 1000;
+            speedValue.textContent = newSpeed.toFixed(1);
+        });
+
+        scaleSelector.addEventListener('change', (e) => { settings.scale = e.target.value; });
+
+        modeSelector.addEventListener('change', (e) => {
+            settings.mode = e.target.value;
+            if (settings.mode === 'text') {
+                staffDisplay.classList.add('hidden');
+                textDisplay.classList.remove('hidden');
+                textDisplay.textContent = '🎵';
+            } else {
+                textDisplay.classList.add('hidden');
+                staffDisplay.classList.remove('hidden');
+                drawStaff();
+            }
+        });
+        
+        // Initial setup
+        drawStaff();
+    </script>
+</body>
+</html>
+
